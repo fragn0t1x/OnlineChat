@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+.gitignore
+.DS_Store
+uploads/
+*.sqlite3
