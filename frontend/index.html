@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Support Chat</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .header {
+      padding: 16px 20px;
+      background: #4361ee;
+      color: white;
+      font-weight: 600;
+    }
+    .messages {
+      height: 400px;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      line-height: 1.4;
+    }
+    .visitor {
+      align-self: flex-end;
+      background: #4361ee;
+      color: white;
+    }
+    .operator {
+      align-self: flex-start;
+      background: #e9ecef;
+      color: #212529;
+    }
+    .input-area {
+      padding: 12px;
+      border-top: 1px solid #dee2e6;
+      display: flex;
+      gap: 8px;
+    }
+    .input-area input, .input-area button {
+      padding: 10px 14px;
+      border: 1px solid #dee2e6;
+      border-radius: 24px;
+      outline: none;
+    }
+    .input-area button {
+      background: #4361ee;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="header">Поддержка</div>
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <input type="text" id="message" placeholder="Напишите сообщение..." />
+      <button onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000/api'
+      : '/api';
+
+    let chatId = localStorage.getItem('support_chat_id');
+
+    async function initChat() {
+      if (!chatId) {
+        const res = await fetch(`${API_BASE}/chat/start`);
+        const data = await res.json();
+        chatId = data.chat_id;
+        localStorage.setItem('support_chat_id', chatId);
+      }
+      loadMessages();
+    }
+
+    async function loadMessages() {
+      const res = await fetch(`${API_BASE}/chat/${chatId}`);
+      const data = await res.json();
+      const el = document.getElementById('messages');
+      el.innerHTML = '';
+      data.messages.forEach(m => {
+        const div = document.createElement('div');
+        div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+        div.textContent = m.text || '—';
+        el.appendChild(div);
+      });
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('message');
+      const text = input.value.trim();
+      if (!text) return;
+
+      await fetch(`${API_BASE}/chat/${chatId}/message`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text})
+      });
+
+      input.value = '';
+      loadMessages();
+    }
+
+    initChat();
+    setInterval(loadMessages, 2000);
+
+    document.getElementById('message').addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>

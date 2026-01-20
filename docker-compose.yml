@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: support_chat
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: ./backend
+    command: >
+      sh -c "
+        while ! pg_isready -h db -U user; do
+          echo 'Waiting for PostgreSQL...';
+          sleep 2;
+        done;
+        alembic upgrade head;
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    volumes:
+      - ./backend:/app
+      - ./frontend:/frontend
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - OPERATOR_CHAT_IDS=${OPERATOR_CHAT_IDS}
+      - WEBHOOK_HOST=${WEBHOOK_HOST}
+      - CHAT_INACTIVE_DAYS=${CHAT_INACTIVE_DAYS}
+    depends_on:
+      - db
+
+volumes:
+  postgres_:
