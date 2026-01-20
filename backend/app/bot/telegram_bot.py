@@ -21,7 +21,7 @@ async def start_telegram_bot():
 
 async def notify_new_message(chat_id: int, text: str):
     # Ссылка на ваш операторский интерфейс
-    web_app_url = f"{WEBHOOK_HOST}/operator?chat_id={chat_id}"
+    web_app_url = f"{WEBHOOK_HOST}operator?chat_id={chat_id}"
 
     # Создаём кнопку Web App
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
