@@ -3,5 +3,7 @@ __pycache__/
 .gitignore
 .DS_Store
 .env
+.env.local
+.env.*.local
 uploads/
 *.sqlite3
