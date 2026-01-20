@@ -16,7 +16,7 @@ CHAT_INACTIVE_DAYS = int(os.getenv("CHAT_INACTIVE_DAYS", "3"))
 
 async def cleanup_inactive_chats():
     while True:
-        await asyncio.sleep(3600)  # Проверяем раз в час
+        await asyncio.sleep(3600)
         cutoff = datetime.utcnow() - timedelta(days=CHAT_INACTIVE_DAYS)
         with SessionLocal() as db:
             db.query(ChatSession).filter(
@@ -37,13 +37,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Подключаем API
+# API
 app.include_router(chat.router, prefix="/api")
 
-# Отдаём статические файлы (виджет и операторскую панель)
-app.mount("/", StaticFiles(directory="/frontend", html=True), name="static")
-
-# Эндпоинт для операторской страницы
+# Отдаём operator.html по /operator
 @app.get("/operator")
 async def operator_page():
     return FileResponse("/frontend/operator.html")
+
+# Остальные статические файлы (виджет)
+app.mount("/", StaticFiles(directory="/frontend", html=True), name="static")
