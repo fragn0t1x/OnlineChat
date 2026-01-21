@@ -48,7 +48,7 @@
       padding: 20px;
     }
 
-    /* Плавающий виджет для примера */
+    /* Демо-виджет */
     #demo-widget {
       position: relative;
       width: 340px;
@@ -243,51 +243,64 @@
 const API_BASE = 'https://ваш_домен.com/api';
 
 let chatId = localStorage.getItem('support_chat_id');
+let isPolling = false;
 
 function toggleWidget() {
   const widget = document.getElementById('support-widget');
-  widget.style.display = widget.style.display === 'block' ? 'none' : 'block';
+  const isVisible = widget.style.display === 'block';
+
+  if (!isVisible) {
+    widget.style.display = 'block';
+    if (!chatId) initChat();
+    startPolling();
+  } else {
+    widget.style.display = 'none';
+    stopPolling();
+  }
 }
 
 async function initChat() {
-  if (!chatId) {
-    const res = await fetch(`${API_BASE}/chat/start`);
-    const data = await res.json();
-    chatId = data.chat_id;
-    localStorage.setItem('support_chat_id', chatId);
-  }
+  const res = await fetch(`${API_BASE}/chat/start`);
+  const data = await res.json();
+  chatId = data.chat_id;
+  localStorage.setItem('support_chat_id', chatId);
   loadMessages();
 }
 
 async function loadMessages() {
   if (!chatId) return;
-  const res = await fetch(`${API_BASE}/chat/${chatId}`);
-  const data = await res.json();
-  const el = document.getElementById('support-messages');
-  el.innerHTML = '';
-  data.messages.forEach(m =&gt; {
-    const div = document.createElement('div');
-    div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-    div.textContent = m.text || '—';
-    // Стили
-    div.style.maxWidth = '80%';
-    div.style.padding = '10px 14px';
-    div.style.borderRadius = '18px';
-    div.style.lineHeight = '1.4';
-    if (m.sender === 'visitor') {
-      div.style.alignSelf = 'flex-end';
-      div.style.background = '#4361ee';
-      div.style.color = 'white';
-      div.style.borderBottomRightRadius = '4px';
-    } else {
-      div.style.alignSelf = 'flex-start';
-      div.style.background = '#e9ecef';
-      div.style.color = '#212529';
-      div.style.borderBottomLeftRadius = '4px';
-    }
-    el.appendChild(div);
-  });
-  el.scrollTop = el.scrollHeight;
+  try {
+    const res = await fetch(`${API_BASE}/chat/${chatId}`);
+    const data = await res.json();
+    const el = document.getElementById('support-messages');
+    if (!el) return;
+
+    el.innerHTML = '';
+    data.messages.forEach(m =&gt; {
+      const div = document.createElement('div');
+      div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+      div.textContent = m.text || '—';
+      div.style.maxWidth = '80%';
+      div.style.padding = '10px 14px';
+      div.style.borderRadius = '18px';
+      div.style.lineHeight = '1.4';
+      if (m.sender === 'visitor') {
+        div.style.alignSelf = 'flex-end';
+        div.style.background = '#4361ee';
+        div.style.color = 'white';
+        div.style.borderBottomRightRadius = '4px';
+      } else {
+        div.style.alignSelf = 'flex-start';
+        div.style.background = '#e9ecef';
+        div.style.color = '#212529';
+        div.style.borderBottomLeftRadius = '4px';
+      }
+      el.appendChild(div);
+    });
+    el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    console.error('Ошибка загрузки сообщений:', e);
+  }
 }
 
 async function sendMessage() {
@@ -302,6 +315,21 @@ async function sendMessage() {
 
   document.getElementById('support-input').value = '';
   loadMessages();
+}
+
+function startPolling() {
+  if (isPolling) return;
+  isPolling = true;
+  loadMessages();
+  this.pollInterval = setInterval(loadMessages, 2000);
+}
+
+function stopPolling() {
+  if (this.pollInterval) {
+    clearInterval(this.pollInterval);
+    this.pollInterval = null;
+  }
+  isPolling = false;
 }
 
 document.getElementById('support-input')?.addEventListener('keypress', e =&gt; {
@@ -355,6 +383,7 @@ const API_BASE = 'https://ваш_домен.com/api';
       : '/api';
 
     let demoChatId = localStorage.getItem('demo_support_chat_id');
+    let demoPolling = false;
 
     async function initDemoChat() {
       if (!demoChatId) {
@@ -367,17 +396,22 @@ const API_BASE = 'https://ваш_домен.com/api';
     }
 
     async function loadDemoMessages() {
-      const res = await fetch(`${API_BASE}/chat/${demoChatId}`);
-      const data = await res.json();
-      const el = document.getElementById('demo-messages');
-      el.innerHTML = '';
-      data.messages.forEach(m => {
-        const div = document.createElement('div');
-        div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-        div.textContent = m.text || '—';
-        el.appendChild(div);
-      });
-      el.scrollTop = el.scrollHeight;
+      if (!demoChatId) return;
+      try {
+        const res = await fetch(`${API_BASE}/chat/${demoChatId}`);
+        const data = await res.json();
+        const el = document.getElementById('demo-messages');
+        el.innerHTML = '';
+        data.messages.forEach(m => {
+          const div = document.createElement('div');
+          div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+          div.textContent = m.text || '—';
+          el.appendChild(div);
+        });
+        el.scrollTop = el.scrollHeight;
+      } catch (e) {
+        console.error('Ошибка загрузки демо-сообщений:', e);
+      }
     }
 
     async function sendDemoMessage() {
@@ -394,12 +428,31 @@ const API_BASE = 'https://ваш_домен.com/api';
       loadDemoMessages();
     }
 
+    function startDemoPolling() {
+      if (demoPolling) return;
+      demoPolling = true;
+      loadDemoMessages();
+      this.demoInterval = setInterval(loadDemoMessages, 2000);
+    }
+
+    function stopDemoPolling() {
+      if (this.demoInterval) {
+        clearInterval(this.demoInterval);
+        this.demoInterval = null;
+      }
+      demoPolling = false;
+    }
+
     document.getElementById('demo-message').addEventListener('keypress', e => {
       if (e.key === 'Enter') sendDemoMessage();
     });
 
-    initDemoChat();
-    setInterval(loadDemoMessages, 2000);
+    // Имитация открытия/закрытия виджета
+    const demoWidget = document.getElementById('demo-widget');
+    demoWidget.addEventListener('click', () => {
+      if (!demoChatId) initDemoChat();
+      if (!demoPolling) startDemoPolling();
+    });
 
     // Переключение платформ
     document.querySelectorAll('.platform-btn').forEach(btn => {
