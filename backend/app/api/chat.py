@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy.orm import Session
 from ..database import SessionLocal, engine
 from .. import models, schemas
 from ..bot.telegram_bot import notify_new_message
-import uuid
-import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import redis
+import os
 
-# Redis connection
+# Redis
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
@@ -26,12 +25,10 @@ def get_db():
         db.close()
 
 
-os.makedirs("/app/uploads", exist_ok=True)
-
-
 @router.get("/chat/start")
 def start_chat(db: Session = Depends(get_db)):
-    session_id = str(uuid.uuid4())
+    from uuid import uuid4
+    session_id = str(uuid4())
     visitor = models.Visitor(session_id=session_id)
     db.add(visitor)
     db.commit()
@@ -47,33 +44,24 @@ def start_chat(db: Session = Depends(get_db)):
 async def send_message(
         chat_id: int,
         text: str = Form(None),
-        file: UploadFile = File(None),
         db: Session = Depends(get_db)
 ):
-    file_url = None
-    if file:
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        filepath = f"/app/uploads/{filename}"
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        file_url = f"/uploads/{filename}"
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
 
     message = models.Message(
         chat_session_id=chat_id,
         sender="visitor",
-        text=text,
-        file_url=file_url
+        text=text.strip()
     )
     db.add(message)
     db.commit()
     db.refresh(message)
 
-    # Clear typing status
-    redis_client.delete(f"typing:{chat_id}")
+    # Очищаем статус "печатает" для оператора
+    redis_client.delete(f"typing_operator:{chat_id}")
 
-    preview = text or (f"📎 Файл: {file.filename}" if file else "Пустое сообщение")
-    await notify_new_message(chat_id, preview, file_url)
+    await notify_new_message(chat_id, text.strip())
     return {"status": "ok"}
 
 
@@ -81,29 +69,21 @@ async def send_message(
 async def reply_to_chat(
         chat_id: int,
         text: str = Form(None),
-        file: UploadFile = File(None),
         db: Session = Depends(get_db)
 ):
-    file_url = None
-    if file:
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        filepath = f"/app/uploads/{filename}"
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        file_url = f"/uploads/{filename}"
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
 
     message = models.Message(
         chat_session_id=chat_id,
         sender="operator",
-        text=text,
-        file_url=file_url
+        text=text.strip()
     )
     db.add(message)
     db.commit()
 
-    # Clear typing status
-    redis_client.delete(f"typing:{chat_id}")
+    # Очищаем статус "печатает" для посетителя
+    redis_client.delete(f"typing_visitor:{chat_id}")
     return {"status": "ok"}
 
 
@@ -116,23 +96,25 @@ def get_chat(chat_id: int, db: Session = Depends(get_db)):
     return {"id": chat.id, "messages": messages}
 
 
-# === НОВЫЕ ЭНДПОИНТЫ ===
-
+# === ТИПИНГ ===
 @router.post("/chat/{chat_id}/typing")
-async def set_typing(chat_id: int, is_typing: bool = True):
+async def set_typing(chat_id: int, role: str = "visitor", is_typing: bool = True):
+    key = f"typing_{'operator' if role == 'visitor' else 'visitor'}:{chat_id}"
     if is_typing:
-        redis_client.setex(f"typing:{chat_id}", 3, "1")  # expires in 3 seconds
+        redis_client.setex(key, 3, "1")
     else:
-        redis_client.delete(f"typing:{chat_id}")
+        redis_client.delete(key)
     return {"status": "ok"}
 
 
 @router.get("/chat/{chat_id}/typing")
-async def get_typing(chat_id: int):
-    is_typing = redis_client.exists(f"typing:{chat_id}")
+async def get_typing(chat_id: int, role: str = "visitor"):
+    key = f"typing_{role}:{chat_id}"
+    is_typing = redis_client.exists(key)
     return {"is_typing": bool(is_typing)}
 
 
+# === ОНЛАЙН ===
 @router.post("/chat/{chat_id}/heartbeat")
 async def heartbeat(chat_id: int, role: str = "visitor"):
     key = f"online:{chat_id}"
@@ -140,7 +122,7 @@ async def heartbeat(chat_id: int, role: str = "visitor"):
         "role": role,
         "last_seen": datetime.utcnow().isoformat()
     }
-    redis_client.setex(key, 35, json.dumps(status))  # expires in 35 seconds
+    redis_client.setex(key, 35, json.dumps(status))
     return {"status": "ok"}
 
 

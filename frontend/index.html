@@ -216,7 +216,11 @@
         <p>Скопируйте код ниже и вставьте его в HTML-блок вашего сайта.</p>
 
         <div class="warning">
-          ⚠️ <strong>Важно:</strong> Замените <code>https://ваш_домен.com</code> на ваш реальный адрес (например, <code>https://veonlinechat.duckdns.org</code>).
+          ⚠️ <strong>Важно:</strong>
+          <ol>
+            <li>Замените <code>https://ваш_домен.com</code> на ваш реальный адрес</li>
+            <li>Убедитесь, что в <code>main.py</code> настроен CORS для вашего домена</li>
+          </ol>
         </div>
 
         <div class="platform">
@@ -255,8 +259,6 @@ let chatId = localStorage.getItem('support_chat_id');
 let isPolling = false;
 let audioContext = null;
 let lastRenderedCount = 0;
-let lastScrollTop = 0;
-let isUserScrolling = false;
 
 // Инициализация аудио
 function playNotificationSound() {
@@ -270,7 +272,7 @@ function playNotificationSound() {
   oscillator.frequency.value = 800;
   gainNode.gain.value = 0.1;
   oscillator.start();
-  setTimeout(() => oscillator.stop(), 200);
+  setTimeout(() =&gt; oscillator.stop(), 200);
 }
 
 // Форматирование даты
@@ -328,7 +330,6 @@ async function loadMessages() {
     const messagesEl = document.getElementById('support-messages');
     if (!messagesEl) return;
 
-    // Сохраняем позицию прокрутки, если пользователь скроллит
     const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop === messagesEl.clientHeight;
 
     const res = await fetch(`${API_BASE}/chat/${chatId}`);
@@ -338,7 +339,6 @@ async function loadMessages() {
       renderMessages(data.messages);
       lastRenderedCount = data.messages.length;
 
-      // Прокручиваем вниз только если были внизу
       if (wasAtBottom) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -352,8 +352,8 @@ async function loadMessages() {
       }
     }
 
-    // Статус "печатает"
-    const typingRes = await fetch(`${API_BASE}/chat/${chatId}/typing`);
+    // Статус "оператор печатает"
+    const typingRes = await fetch(`${API_BASE}/chat/${chatId}/typing?role=operator`);
     const typingData = await typingRes.json();
     const typingEl = document.getElementById('typing-indicator');
     if (typingEl) {
@@ -377,7 +377,6 @@ function renderMessages(messages) {
   const el = document.getElementById('support-messages');
   if (!el) return;
 
-  // Группировка по датам
   const groups = {};
   messages.forEach(m =&gt; {
     const dateKey = formatDate(m.created_at);
@@ -402,7 +401,6 @@ function renderMessages(messages) {
       div.style.padding = '10px 14px';
       div.style.borderRadius = '18px';
       div.style.lineHeight = '1.4';
-      div.style.position = 'relative';
       if (m.sender === 'visitor') {
         div.style.alignSelf = 'flex-end';
         div.style.background = '#4361ee';
@@ -417,7 +415,6 @@ function renderMessages(messages) {
 
       div.textContent = m.text || '—';
 
-      // Время
       const timeEl = document.createElement('div');
       timeEl.style.fontSize = '10px';
       timeEl.style.opacity = '0.7';
@@ -431,14 +428,6 @@ function renderMessages(messages) {
   });
 }
 
-// Обработка прокрутки
-document.getElementById('support-messages')?.addEventListener('scroll', () =&gt; {
-  const el = document.getElementById('support-messages');
-  if (!el) return;
-  const isAtBottom = el.scrollHeight - el.scrollTop === el.clientHeight;
-  isUserScrolling = !isAtBottom;
-});
-
 async function sendMessage() {
   const text = document.getElementById('support-input').value.trim();
   if (!text) return;
@@ -447,17 +436,20 @@ async function sendMessage() {
   await fetch(`${API_BASE}/chat/${chatId}/typing`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({is_typing: false})
+    body: JSON.stringify({role: 'visitor', is_typing: false})
   });
 
-  await fetch(`${API_BASE}/chat/${chatId}/message`, {
+  // Отправляем сообщение
+  const res = await fetch(`${API_BASE}/chat/${chatId}/message`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({text})
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `text=${encodeURIComponent(text)}`
   });
 
-  document.getElementById('support-input').value = '';
-  loadMessages();
+  if (res.ok) {
+    document.getElementById('support-input').value = '';
+    loadMessages();
+  }
 }
 
 // Обработка набора текста
@@ -469,7 +461,7 @@ document.getElementById('support-input')?.addEventListener('input', () =&gt; {
   fetch(`${API_BASE}/chat/${chatId}/typing`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({is_typing: true})
+    body: JSON.stringify({role: 'visitor', is_typing: true})
   });
 
   clearTimeout(typingTimeout);
@@ -477,7 +469,7 @@ document.getElementById('support-input')?.addEventListener('input', () =&gt; {
     fetch(`${API_BASE}/chat/${chatId}/typing`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({is_typing: false})
+      body: JSON.stringify({role: 'visitor', is_typing: false})
     });
   }, 2000);
 });
@@ -577,14 +569,14 @@ const API_BASE = 'https://ваш_домен.com/api';
         }
 
         // Статус "печатает"
-        const typingRes = await fetch(`${API_BASE}/chat/${demoChatId}/typing`);
+        const typingRes = await fetch(`${API_BASE}/chat/${demoChatId}/typing?role=operator`);
         const typingData = await typingRes.json();
         const typingEl = document.getElementById('demo-typing-indicator');
         if (typingEl) {
           typingEl.style.display = typingData.is_typing ? 'block' : 'none';
         }
 
-        // Онлайн-статус (оператор всегда онлайн в демо)
+        // Онлайн-статус
         const onlineEl = document.getElementById('demo-online-status');
         if (onlineEl) {
           onlineEl.textContent = '● Оператор онлайн';
@@ -655,14 +647,16 @@ const API_BASE = 'https://ваш_домен.com/api';
       const text = document.getElementById('demo-message').value.trim();
       if (!text) return;
 
-      await fetch(`${API_BASE}/chat/${demoChatId}/message`, {
+      const res = await fetch(`${API_BASE}/chat/${demoChatId}/message`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text})
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `text=${encodeURIComponent(text)}`
       });
 
-      document.getElementById('demo-message').value = '';
-      loadDemoMessages();
+      if (res.ok) {
+        document.getElementById('demo-message').value = '';
+        loadDemoMessages();
+      }
     }
 
     function startDemoPolling() {

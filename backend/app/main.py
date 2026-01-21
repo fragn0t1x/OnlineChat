@@ -40,7 +40,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ← разрешить все источники (для разработки)
+    allow_origins=["https://project5666571.tilda.ws"],  # ← явно укажите ваш Tilda-сайт
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
