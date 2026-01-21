@@ -1,11 +1,10 @@
 # backend/app/api/chat.py
-from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import SessionLocal, engine
 from .. import models, schemas
-from ..bot.telegram_bot import notify_new_message
+from ..bot.telegram_bot import notify_new_message  # ← асинхронная функция
 import uuid
-import os
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -17,9 +16,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-# Убедитесь, что папка uploads существует
-os.makedirs("/app/uploads", exist_ok=True)
 
 @router.get("/chat/start")
 def start_chat(db: Session = Depends(get_db)):
@@ -34,61 +30,28 @@ def start_chat(db: Session = Depends(get_db)):
     db.refresh(chat)
     return {"session_id": session_id, "chat_id": chat.id}
 
+# 👇 ЭТОТ РОУТ ДОЛЖЕН БЫТЬ АСИНХРОННЫМ
 @router.post("/chat/{chat_id}/message")
-async def send_message(
-    chat_id: int,
-    text: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
-    file_url = None
-    if file:
-        # Генерируем уникальное имя файла
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        filepath = f"/app/uploads/{filename}"
-        # Сохраняем файл
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        file_url = f"/uploads/{filename}"
-
-    # Сохраняем сообщение в БД
+async def send_message(chat_id: int, msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     message = models.Message(
         chat_session_id=chat_id,
         sender="visitor",
-        text=text,
-        file_url=file_url
+        text=msg.text
     )
     db.add(message)
     db.commit()
     db.refresh(message)
 
-    # Отправляем уведомление в Telegram
-    preview = text or (f"📎 Файл: {file.filename}" if file else "Пустое сообщение")
-    await notify_new_message(chat_id, preview, file_url)
+    # 👇 ВЫЗЫВАЕМ АСИНХРОННО
+    await notify_new_message(chat_id, msg.text or "Пустое сообщение")
     return {"status": "ok"}
 
 @router.post("/chat/{chat_id}/reply")
-async def reply_to_chat(
-    chat_id: int,
-    text: str = Form(None),
-    file: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
-    file_url = None
-    if file:
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        filepath = f"/app/uploads/{filename}"
-        with open(filepath, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        file_url = f"/uploads/{filename}"
-
+def reply_to_chat(chat_id: int, msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     message = models.Message(
         chat_session_id=chat_id,
         sender="operator",
-        text=text,
-        file_url=file_url
+        text=msg.text
     )
     db.add(message)
     db.commit()
