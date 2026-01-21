@@ -191,7 +191,12 @@
       <div class="card-body">
         <div id="demo-widget">
           <div class="chat-container">
+            <div style="padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;">
+              💬 Поддержка
+              <span id="demo-online-status" style="float:right;font-size:12px;"></span>
+            </div>
             <div class="messages" id="demo-messages"></div>
+            <div id="demo-typing-indicator" style="padding:8px 16px;font-size:12px;color:#6c757d;display:none;">Оператор печатает...</div>
             <div class="input-area">
               <input type="text" id="demo-message" placeholder="Напишите сообщение..." />
               <button class="send-btn" onclick="sendDemoMessage()">➤</button>
@@ -228,8 +233,12 @@
             <p><strong>Шаг 3:</strong> Вставьте этот код:</p>
             <pre id="tilda-snippet">&lt;!-- Support Chat Widget --&gt;
 &lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
-  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;💬 Поддержка&lt;/div&gt;
+  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;
+    💬 Поддержка
+    &lt;span id=&quot;online-status&quot; style=&quot;float:right;font-size:12px;&quot;&gt;&lt;/span&gt;
+  &lt;/div&gt;
   &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
+  &lt;div id=&quot;typing-indicator&quot; style=&quot;padding:8px 16px;font-size:12px;color:#6c757d;display:none;&quot;&gt;Оператор печатает...&lt;/div&gt;
   &lt;div style=&quot;padding:12px;border-top:1px solid #dee2e6;display:flex;gap:8px;&quot;&gt;
     &lt;input type=&quot;text&quot; id=&quot;support-input&quot; placeholder=&quot;Напишите сообщение...&quot; style=&quot;flex:1;padding:10px 14px;border:1px solid #dee2e6;border-radius:24px;outline:none;font-size:14px;&quot; /&gt;
     &lt;button onclick=&quot;sendMessage()&quot; style=&quot;width:40px;height:40px;border-radius:50%;background:#4361ee;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;padding:0;&quot;&gt;➤&lt;/button&gt;
@@ -244,6 +253,44 @@ const API_BASE = 'https://ваш_домен.com/api';
 
 let chatId = localStorage.getItem('support_chat_id');
 let isPolling = false;
+let audioContext = null;
+let lastRenderedCount = 0;
+let lastScrollTop = 0;
+let isUserScrolling = false;
+
+// Инициализация аудио
+function playNotificationSound() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  oscillator.frequency.value = 800;
+  gainNode.gain.value = 0.1;
+  oscillator.start();
+  setTimeout(() => oscillator.stop(), 200);
+}
+
+// Форматирование даты
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date &gt;= today) return 'Сегодня';
+  if (date &gt;= yesterday) return 'Вчера';
+
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric', year: 'numeric' });
+}
+
+// Форматирование времени
+function formatTime(dateStr) {
+  return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
 
 function toggleWidget() {
   const widget = document.getElementById('support-widget');
@@ -253,6 +300,14 @@ function toggleWidget() {
     widget.style.display = 'block';
     if (!chatId) initChat();
     startPolling();
+    // Heartbeat как visitor
+    setInterval(() =&gt; {
+      fetch(`${API_BASE}/chat/${chatId}/heartbeat`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: 'visitor'})
+      });
+    }, 25000);
   } else {
     widget.style.display = 'none';
     stopPolling();
@@ -270,20 +325,84 @@ async function initChat() {
 async function loadMessages() {
   if (!chatId) return;
   try {
+    const messagesEl = document.getElementById('support-messages');
+    if (!messagesEl) return;
+
+    // Сохраняем позицию прокрутки, если пользователь скроллит
+    const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop === messagesEl.clientHeight;
+
     const res = await fetch(`${API_BASE}/chat/${chatId}`);
     const data = await res.json();
-    const el = document.getElementById('support-messages');
-    if (!el) return;
 
-    el.innerHTML = '';
-    data.messages.forEach(m =&gt; {
+    if (data.messages.length !== lastRenderedCount) {
+      renderMessages(data.messages);
+      lastRenderedCount = data.messages.length;
+
+      // Прокручиваем вниз только если были внизу
+      if (wasAtBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      // Проигрываем звук для новых сообщений от оператора
+      if (data.messages.length &gt; 0) {
+        const lastMsg = data.messages[data.messages.length - 1];
+        if (lastMsg.sender === 'operator') {
+          playNotificationSound();
+        }
+      }
+    }
+
+    // Статус "печатает"
+    const typingRes = await fetch(`${API_BASE}/chat/${chatId}/typing`);
+    const typingData = await typingRes.json();
+    const typingEl = document.getElementById('typing-indicator');
+    if (typingEl) {
+      typingEl.style.display = typingData.is_typing ? 'block' : 'none';
+    }
+
+    // Онлайн-статус
+    const onlineRes = await fetch(`${API_BASE}/chat/${chatId}/online`);
+    const onlineData = await onlineRes.json();
+    const onlineEl = document.getElementById('online-status');
+    if (onlineEl) {
+      onlineEl.textContent = onlineData.operator_online ? '● Оператор онлайн' : '○ Оператор оффлайн';
+      onlineEl.style.color = onlineData.operator_online ? '#28a745' : '#6c757d';
+    }
+  } catch (e) {
+    console.error('Ошибка загрузки сообщений:', e);
+  }
+}
+
+function renderMessages(messages) {
+  const el = document.getElementById('support-messages');
+  if (!el) return;
+
+  // Группировка по датам
+  const groups = {};
+  messages.forEach(m =&gt; {
+    const dateKey = formatDate(m.created_at);
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(m);
+  });
+
+  el.innerHTML = '';
+  Object.keys(groups).forEach(dateLabel =&gt; {
+    const dateDiv = document.createElement('div');
+    dateDiv.style.marginTop = '16px';
+    dateDiv.style.fontSize = '12px';
+    dateDiv.style.color = '#6c757d';
+    dateDiv.style.textAlign = 'center';
+    dateDiv.textContent = dateLabel;
+    el.appendChild(dateDiv);
+
+    groups[dateLabel].forEach(m =&gt; {
       const div = document.createElement('div');
       div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-      div.textContent = m.text || '—';
       div.style.maxWidth = '80%';
       div.style.padding = '10px 14px';
       div.style.borderRadius = '18px';
       div.style.lineHeight = '1.4';
+      div.style.position = 'relative';
       if (m.sender === 'visitor') {
         div.style.alignSelf = 'flex-end';
         div.style.background = '#4361ee';
@@ -295,17 +414,41 @@ async function loadMessages() {
         div.style.color = '#212529';
         div.style.borderBottomLeftRadius = '4px';
       }
+
+      div.textContent = m.text || '—';
+
+      // Время
+      const timeEl = document.createElement('div');
+      timeEl.style.fontSize = '10px';
+      timeEl.style.opacity = '0.7';
+      timeEl.style.marginTop = '4px';
+      timeEl.style.textAlign = m.sender === 'visitor' ? 'right' : 'left';
+      timeEl.textContent = formatTime(m.created_at);
+      div.appendChild(timeEl);
+
       el.appendChild(div);
     });
-    el.scrollTop = el.scrollHeight;
-  } catch (e) {
-    console.error('Ошибка загрузки сообщений:', e);
-  }
+  });
 }
+
+// Обработка прокрутки
+document.getElementById('support-messages')?.addEventListener('scroll', () =&gt; {
+  const el = document.getElementById('support-messages');
+  if (!el) return;
+  const isAtBottom = el.scrollHeight - el.scrollTop === el.clientHeight;
+  isUserScrolling = !isAtBottom;
+});
 
 async function sendMessage() {
   const text = document.getElementById('support-input').value.trim();
   if (!text) return;
+
+  // Отправляем статус "не печатает"
+  await fetch(`${API_BASE}/chat/${chatId}/typing`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({is_typing: false})
+  });
 
   await fetch(`${API_BASE}/chat/${chatId}/message`, {
     method: 'POST',
@@ -316,6 +459,28 @@ async function sendMessage() {
   document.getElementById('support-input').value = '';
   loadMessages();
 }
+
+// Обработка набора текста
+let typingTimeout;
+document.getElementById('support-input')?.addEventListener('input', () =&gt; {
+  if (!chatId) return;
+
+  // Отправляем статус "печатает"
+  fetch(`${API_BASE}/chat/${chatId}/typing`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({is_typing: true})
+  });
+
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() =&gt; {
+    fetch(`${API_BASE}/chat/${chatId}/typing`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({is_typing: false})
+    });
+  }, 2000);
+});
 
 function startPolling() {
   if (isPolling) return;
@@ -353,8 +518,12 @@ document.getElementById('toggle-widget').addEventListener('click', () =&gt; {
             <p><strong>Шаг 4:</strong> Вставьте этот код в нужное место:</p>
             <pre id="modx-snippet">&lt;!-- Support Chat Widget --&gt;
 &lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
-  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;💬 Поддержка&lt;/div&gt;
+  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;
+    💬 Поддержка
+    &lt;span id=&quot;online-status&quot; style=&quot;float:right;font-size:12px;&quot;&gt;&lt;/span&gt;
+  &lt;/div&gt;
   &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
+  &lt;div id=&quot;typing-indicator&quot; style=&quot;padding:8px 16px;font-size:12px;color:#6c757d;display:none;&quot;&gt;Оператор печатает...&lt;/div&gt;
   &lt;div style=&quot;padding:12px;border-top:1px solid #dee2e6;display:flex;gap:8px;&quot;&gt;
     &lt;input type=&quot;text&quot; id=&quot;support-input&quot; placeholder=&quot;Напишите сообщение...&quot; style=&quot;flex:1;padding:10px 14px;border:1px solid #dee2e6;border-radius:24px;outline:none;font-size:14px;&quot; /&gt;
     &lt;button onclick=&quot;sendMessage()&quot; style=&quot;width:40px;height:40px;border-radius:50%;background:#4361ee;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;padding:0;&quot;&gt;➤&lt;/button&gt;
@@ -384,6 +553,7 @@ const API_BASE = 'https://ваш_домен.com/api';
 
     let demoChatId = localStorage.getItem('demo_support_chat_id');
     let demoPolling = false;
+    let demoLastRenderedCount = 0;
 
     async function initDemoChat() {
       if (!demoChatId) {
@@ -400,18 +570,85 @@ const API_BASE = 'https://ваш_домен.com/api';
       try {
         const res = await fetch(`${API_BASE}/chat/${demoChatId}`);
         const data = await res.json();
-        const el = document.getElementById('demo-messages');
-        el.innerHTML = '';
-        data.messages.forEach(m => {
-          const div = document.createElement('div');
-          div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-          div.textContent = m.text || '—';
-          el.appendChild(div);
-        });
-        el.scrollTop = el.scrollHeight;
+
+        if (data.messages.length !== demoLastRenderedCount) {
+          renderDemoMessages(data.messages);
+          demoLastRenderedCount = data.messages.length;
+        }
+
+        // Статус "печатает"
+        const typingRes = await fetch(`${API_BASE}/chat/${demoChatId}/typing`);
+        const typingData = await typingRes.json();
+        const typingEl = document.getElementById('demo-typing-indicator');
+        if (typingEl) {
+          typingEl.style.display = typingData.is_typing ? 'block' : 'none';
+        }
+
+        // Онлайн-статус (оператор всегда онлайн в демо)
+        const onlineEl = document.getElementById('demo-online-status');
+        if (onlineEl) {
+          onlineEl.textContent = '● Оператор онлайн';
+          onlineEl.style.color = '#28a745';
+        }
       } catch (e) {
         console.error('Ошибка загрузки демо-сообщений:', e);
       }
+    }
+
+    function renderDemoMessages(messages) {
+      const el = document.getElementById('demo-messages');
+      if (!el) return;
+
+      const groups = {};
+      messages.forEach(m => {
+        const dateKey = formatDate(m.created_at);
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(m);
+      });
+
+      el.innerHTML = '';
+      Object.keys(groups).forEach(dateLabel => {
+        const dateDiv = document.createElement('div');
+        dateDiv.style.marginTop = '16px';
+        dateDiv.style.fontSize = '12px';
+        dateDiv.style.color = '#6c757d';
+        dateDiv.style.textAlign = 'center';
+        dateDiv.textContent = dateLabel;
+        el.appendChild(dateDiv);
+
+        groups[dateLabel].forEach(m => {
+          const div = document.createElement('div');
+          div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+          div.style.maxWidth = '80%';
+          div.style.padding = '10px 14px';
+          div.style.borderRadius = '18px';
+          div.style.lineHeight = '1.4';
+          if (m.sender === 'visitor') {
+            div.style.alignSelf = 'flex-end';
+            div.style.background = '#4361ee';
+            div.style.color = 'white';
+            div.style.borderBottomRightRadius = '4px';
+          } else {
+            div.style.alignSelf = 'flex-start';
+            div.style.background = '#e9ecef';
+            div.style.color = '#212529';
+            div.style.borderBottomLeftRadius = '4px';
+          }
+
+          div.textContent = m.text || '—';
+
+          const timeEl = document.createElement('div');
+          timeEl.style.fontSize = '10px';
+          timeEl.style.opacity = '0.7';
+          timeEl.style.marginTop = '4px';
+          timeEl.style.textAlign = m.sender === 'visitor' ? 'right' : 'left';
+          timeEl.textContent = formatTime(m.created_at);
+          div.appendChild(timeEl);
+
+          el.appendChild(div);
+        });
+      });
+      el.scrollTop = el.scrollHeight;
     }
 
     async function sendDemoMessage() {
@@ -447,12 +684,29 @@ const API_BASE = 'https://ваш_домен.com/api';
       if (e.key === 'Enter') sendDemoMessage();
     });
 
-    // Имитация открытия/закрытия виджета
     const demoWidget = document.getElementById('demo-widget');
     demoWidget.addEventListener('click', () => {
       if (!demoChatId) initDemoChat();
       if (!demoPolling) startDemoPolling();
     });
+
+    // Функции форматирования (общие)
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      if (date >= today) return 'Сегодня';
+      if (date >= yesterday) return 'Вчера';
+
+      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric', year: 'numeric' });
+    }
+
+    function formatTime(dateStr) {
+      return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
 
     // Переключение платформ
     document.querySelectorAll('.platform-btn').forEach(btn => {
