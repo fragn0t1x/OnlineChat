@@ -1,38 +1,206 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Оператор</title>
+  <style>
+    :root {
+      --primary: #4361ee;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --border: #dee2e6;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fafafa;
+      padding: 20px;
+    }
+
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 16px 20px;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .messages {
+      height: 500px;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      line-height: 1.4;
+    }
+
+    .visitor {
+      align-self: flex-start;
+      background: #e9ecef;
+      color: var(--dark);
+      border-bottom-left-radius: 4px;
+    }
+
+    .operator {
+      align-self: flex-end;
+      background: var(--primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .preview {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+    }
+
+    .input-area {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .input-area input[type="text"] {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .attach-btn, .send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .attach-btn {
+      background: #f1f3f5;
+      color: #495057;
+    }
+
+    .send-btn {
+      background: var(--primary);
+      color: white;
+    }
+
+    .file-input {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Операторский интерфейс</h1>
-  <div id="messages"></div>
-  <input type="text" id="reply" />
-  <button onclick="sendReply()">Отправить</button>
+  <div class="chat-container">
+    <div class="header">👨‍💻 Оператор — Чат <span id="chat-id"></span></div>
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <input type="text" id="message" placeholder="Напишите ответ..." />
+      <label for="fileInput" class="attach-btn">📎</label>
+      <input type="file" id="fileInput" class="file-input" accept="image/*,.pdf,.doc,.txt" />
+      <button class="send-btn" onclick="sendReply()">➤</button>
+    </div>
+  </div>
 
   <script>
-    const chatId = new URLSearchParams(window.location.search).get('chat_id');
-    document.title += ` — Чат ${chatId}`;
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000/api'
+      : '/api';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const chatId = urlParams.get('chat_id');
+    document.getElementById('chat-id').textContent = chatId;
 
     async function loadMessages() {
-      const res = await fetch(`/api/chat/${chatId}`);
+      const res = await fetch(`${API_BASE}/chat/${chatId}`);
       const data = await res.json();
       const el = document.getElementById('messages');
       el.innerHTML = '';
       data.messages.forEach(m => {
-        el.innerHTML += `<div><b>${m.sender}:</b> ${m.text}</div>`;
+        const div = document.createElement('div');
+        div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+        if (m.text) div.textContent = m.text;
+        if (m.file_url) {
+          if (m.file_url.endsWith('.jpg') || m.file_url.endsWith('.jpeg') ||
+              m.file_url.endsWith('.png') || m.file_url.endsWith('.gif')) {
+            const img = document.createElement('img');
+            img.src = m.file_url;
+            img.className = 'preview';
+            div.appendChild(img);
+          } else {
+            const a = document.createElement('a');
+            a.href = m.file_url;
+            a.textContent = '📎 Скачать файл';
+            a.target = '_blank';
+            div.appendChild(a);
+          }
+        }
+        el.appendChild(div);
       });
+      el.scrollTop = el.scrollHeight;
     }
 
     async function sendReply() {
-      const text = document.getElementById('reply').value;
-      await fetch(`/api/chat/${chatId}/reply`, {
+      const text = document.getElementById('message').value.trim();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+
+      const formData = new FormData();
+      if (text) formData.append('text', text);
+      if (file) formData.append('file', file);
+
+      const res = await fetch(`${API_BASE}/chat/${chatId}/reply`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text})
+        body: formData
       });
-      document.getElementById('reply').value = '';
-      loadMessages();
+
+      if (res.ok) {
+        document.getElementById('message').value = '';
+        fileInput.value = '';
+        loadMessages();
+      }
     }
+
+    document.getElementById('fileInput').addEventListener('change', () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (file) {
+        const fileName = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
+        document.getElementById('message').placeholder = `Файл: ${fileName}`;
+      }
+    });
+
+    document.getElementById('message').addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendReply();
+    });
 
     loadMessages();
     setInterval(loadMessages, 2000);
