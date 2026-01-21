@@ -1,4 +1,11 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   db:
     image: postgres:16
     environment:
@@ -32,8 +39,11 @@ services:
       - OPERATOR_CHAT_IDS=${OPERATOR_CHAT_IDS}
       - WEBHOOK_HOST=${WEBHOOK_HOST}
       - CHAT_INACTIVE_DAYS=${CHAT_INACTIVE_DAYS}
+      - REDIS_URL={REDIS_URL}
     depends_on:
       - db
+      - redis
 
 volumes:
+  redis_data:
   postgres_:
