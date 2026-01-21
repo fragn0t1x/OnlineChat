@@ -155,6 +155,8 @@
     const chatId = urlParams.get('chat_id');
     document.getElementById('chat-id').textContent = chatId;
 
+    let lastRenderedCount = 0;
+
     // Форматирование даты
     function formatDate(dateStr) {
       const date = new Date(dateStr);
@@ -175,19 +177,43 @@
     }
 
     async function loadMessages() {
-      const res = await fetch(`${API_BASE}/chat/${chatId}`);
-      const data = await res.json();
-      const el = document.getElementById('messages');
-      el.innerHTML = '';
+      if (!chatId) return;
+      try {
+        const messagesEl = document.getElementById('messages');
+        if (!messagesEl) return;
 
-      // Группировка по датам
+        // Сохраняем позицию прокрутки
+        const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop === messagesEl.clientHeight;
+
+        const res = await fetch(`${API_BASE}/chat/${chatId}`);
+        const data = await res.json();
+
+        if (data.messages.length !== lastRenderedCount) {
+          renderMessages(data.messages);
+          lastRenderedCount = data.messages.length;
+
+          // Прокручиваем вниз ТОЛЬКО если были внизу
+          if (wasAtBottom) {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        }
+      } catch (e) {
+        console.error('Ошибка загрузки сообщений:', e);
+      }
+    }
+
+    function renderMessages(messages) {
+      const el = document.getElementById('messages');
+      if (!el) return;
+
       const groups = {};
-      data.messages.forEach(m => {
+      messages.forEach(m => {
         const dateKey = formatDate(m.created_at);
         if (!groups[dateKey]) groups[dateKey] = [];
         groups[dateKey].push(m);
       });
 
+      el.innerHTML = '';
       Object.keys(groups).forEach(dateLabel => {
         const dateDiv = document.createElement('div');
         dateDiv.style.marginTop = '16px';
@@ -202,7 +228,6 @@
           div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
           div.textContent = m.text || '—';
 
-          // Время
           const timeEl = document.createElement('div');
           timeEl.style.fontSize = '10px';
           timeEl.style.opacity = '0.7';
@@ -214,7 +239,6 @@
           el.appendChild(div);
         });
       });
-      el.scrollTop = el.scrollHeight;
     }
 
     async function sendReply() {
@@ -238,7 +262,7 @@
 
       if (res.ok) {
         document.getElementById('message').value = '';
-        loadMessages();
+        loadMessages(); // Обновляем сразу после отправки
       }
     }
 
@@ -247,7 +271,6 @@
     document.getElementById('message')?.addEventListener('input', () => {
       if (!chatId) return;
 
-      // Отправляем статус "печатает"
       fetch(`${API_BASE}/chat/${chatId}/typing`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -267,7 +290,6 @@
     // Загрузка статусов
     async function loadStatuses() {
       try {
-        // Онлайн-статус посетителя
         const onlineRes = await fetch(`${API_BASE}/chat/${chatId}/online`);
         const onlineData = await onlineRes.json();
         const statusDot = document.getElementById('visitor-status');
@@ -275,7 +297,6 @@
           statusDot.className = `status-dot ${onlineData.visitor_online ? 'online' : ''}`;
         }
 
-        // Статус "печатает" посетителя
         const typingRes = await fetch(`${API_BASE}/chat/${chatId}/typing?role=visitor`);
         const typingData = await typingRes.json();
         const typingEl = document.getElementById('typing-indicator');
@@ -291,13 +312,6 @@
       if (e.key === 'Enter') sendReply();
     });
 
-    loadMessages();
-    loadStatuses();
-    setInterval(() => {
-      loadMessages();
-      loadStatuses();
-    }, 2000);
-
     // Heartbeat как оператор
     setInterval(() => {
       fetch(`${API_BASE}/chat/${chatId}/heartbeat`, {
@@ -306,6 +320,14 @@
         body: JSON.stringify({role: 'operator'})
       });
     }, 25000);
+
+    // Запуск
+    loadMessages();
+    loadStatuses();
+    setInterval(() => {
+      loadMessages();
+      loadStatuses();
+    }, 2000);
   </script>
 </body>
 </html>
