@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Support Chat</title>
+  <title>Support Chat — Установка</title>
   <style>
     :root {
       --primary: #4361ee;
@@ -17,35 +17,42 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #fafafa;
+      padding: 20px;
+      line-height: 1.6;
     }
 
-    /* Плавающий виджет */
-    #support-widget {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 340px;
-      z-index: 10000;
-      display: none;
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
     }
 
-    /* Кнопка-иконка */
-    #toggle-widget {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 60px;
-      height: 60px;
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
       background: var(--primary);
       color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(67, 97, 238, 0.4);
-      z-index: 10001;
-      font-size: 24px;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    /* Плавающий виджет для примера */
+    #demo-widget {
+      position: relative;
+      width: 340px;
+      margin: 0 auto;
     }
 
     .chat-container {
@@ -53,14 +60,6 @@
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       overflow: hidden;
-    }
-
-    .header {
-      padding: 16px 20px;
-      background: var(--primary);
-      color: white;
-      font-weight: 600;
-      font-size: 18px;
     }
 
     .messages {
@@ -121,51 +120,256 @@
       align-items: center;
       justify-content: center;
       font-size: 18px;
-      /* Исправление растягивания */
       padding: 0;
+    }
+
+    h2 {
+      margin: 16px 0 12px;
+      color: var(--primary);
+    }
+
+    p {
+      margin-bottom: 12px;
+    }
+
+    pre {
+      background: #f8f9fa;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      margin: 12px 0;
+    }
+
+    .step {
+      margin-bottom: 20px;
+    }
+
+    .platform {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .platform-btn {
+      padding: 6px 12px;
+      background: var(--light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .platform-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .code-block {
+      display: none;
+    }
+
+    .code-block.active {
+      display: block;
+    }
+
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      color: #856404;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 16px 0;
     }
   </style>
 </head>
 <body>
-  <!-- Плавающий виджет -->
-  <div id="support-widget" class="chat-container">
-    <div class="header">💬 Поддержка</div>
-    <div class="messages" id="messages"></div>
-    <div class="input-area">
-      <input type="text" id="message" placeholder="Напишите сообщение..." />
-      <button class="send-btn" onclick="sendMessage()">➤</button>
+  <div class="container">
+    <!-- Демо виджет -->
+    <div class="card">
+      <div class="card-header">💬 Демо виджета</div>
+      <div class="card-body">
+        <div id="demo-widget">
+          <div class="chat-container">
+            <div class="messages" id="demo-messages"></div>
+            <div class="input-area">
+              <input type="text" id="demo-message" placeholder="Напишите сообщение..." />
+              <button class="send-btn" onclick="sendDemoMessage()">➤</button>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top: 16px; text-align: center; color: #6c757d;">
+          Это пример виджета. На вашем сайте он будет появляться по клику на иконку.
+        </p>
+      </div>
+    </div>
+
+    <!-- Инструкция -->
+    <div class="card">
+      <div class="card-header">🛠️ Установка на сайт</div>
+      <div class="card-body">
+        <p>Скопируйте код ниже и вставьте его в HTML-блок вашего сайта.</p>
+
+        <div class="warning">
+          ⚠️ <strong>Важно:</strong> Замените <code>https://ваш_домен.com</code> на ваш реальный адрес (например, <code>https://veonlinechat.duckdns.org</code>).
+        </div>
+
+        <div class="platform">
+          <div class="platform-btn active" data-target="tilda">Tilda</div>
+          <div class="platform-btn" data-target="modx">MODX</div>
+        </div>
+
+        <!-- Tilda -->
+        <div class="code-block active" id="tilda-code">
+          <h2>Для Tilda:</h2>
+          <div class="step">
+            <p><strong>Шаг 1:</strong> Откройте редактор Tilda</p>
+            <p><strong>Шаг 2:</strong> Добавьте блок «HTML-код» (T123)</p>
+            <p><strong>Шаг 3:</strong> Вставьте этот код:</p>
+            <pre id="tilda-snippet">&lt;!-- Support Chat Widget --&gt;
+&lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
+  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;💬 Поддержка&lt;/div&gt;
+  &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
+  &lt;div style=&quot;padding:12px;border-top:1px solid #dee2e6;display:flex;gap:8px;&quot;&gt;
+    &lt;input type=&quot;text&quot; id=&quot;support-input&quot; placeholder=&quot;Напишите сообщение...&quot; style=&quot;flex:1;padding:10px 14px;border:1px solid #dee2e6;border-radius:24px;outline:none;font-size:14px;&quot; /&gt;
+    &lt;button onclick=&quot;sendMessage()&quot; style=&quot;width:40px;height:40px;border-radius:50%;background:#4361ee;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;padding:0;&quot;&gt;➤&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;toggle-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:60px;height:60px;background:#4361ee;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(67,97,238,0.4);z-index:10001;font-size:24px;&quot; onclick=&quot;toggleWidget()&quot;&gt;💬&lt;/div&gt;
+
+&lt;script&gt;
+// ⚠️ ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ ДОМЕН!
+const API_BASE = 'https://ваш_домен.com/api';
+
+let chatId = localStorage.getItem('support_chat_id');
+
+function toggleWidget() {
+  const widget = document.getElementById('support-widget');
+  widget.style.display = widget.style.display === 'block' ? 'none' : 'block';
+}
+
+async function initChat() {
+  if (!chatId) {
+    const res = await fetch(`${API_BASE}/chat/start`);
+    const data = await res.json();
+    chatId = data.chat_id;
+    localStorage.setItem('support_chat_id', chatId);
+  }
+  loadMessages();
+}
+
+async function loadMessages() {
+  if (!chatId) return;
+  const res = await fetch(`${API_BASE}/chat/${chatId}`);
+  const data = await res.json();
+  const el = document.getElementById('support-messages');
+  el.innerHTML = '';
+  data.messages.forEach(m =&gt; {
+    const div = document.createElement('div');
+    div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+    div.textContent = m.text || '—';
+    // Стили
+    div.style.maxWidth = '80%';
+    div.style.padding = '10px 14px';
+    div.style.borderRadius = '18px';
+    div.style.lineHeight = '1.4';
+    if (m.sender === 'visitor') {
+      div.style.alignSelf = 'flex-end';
+      div.style.background = '#4361ee';
+      div.style.color = 'white';
+      div.style.borderBottomRightRadius = '4px';
+    } else {
+      div.style.alignSelf = 'flex-start';
+      div.style.background = '#e9ecef';
+      div.style.color = '#212529';
+      div.style.borderBottomLeftRadius = '4px';
+    }
+    el.appendChild(div);
+  });
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendMessage() {
+  const text = document.getElementById('support-input').value.trim();
+  if (!text) return;
+
+  await fetch(`${API_BASE}/chat/${chatId}/message`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text})
+  });
+
+  document.getElementById('support-input').value = '';
+  loadMessages();
+}
+
+document.getElementById('support-input')?.addEventListener('keypress', e =&gt; {
+  if (e.key === 'Enter') sendMessage();
+});
+
+document.getElementById('toggle-widget').addEventListener('click', () =&gt; {
+  if (!chatId) initChat();
+});
+&lt;/script&gt;</pre>
+          </div>
+        </div>
+
+        <!-- MODX -->
+        <div class="code-block" id="modx-code">
+          <h2>Для MODX:</h2>
+          <div class="step">
+            <p><strong>Шаг 1:</strong> Откройте редактор ресурса</p>
+            <p><strong>Шаг 2:</strong> Перейдите во вкладку «Содержимое»</p>
+            <p><strong>Шаг 3:</strong> Включите режим «HTML»</p>
+            <p><strong>Шаг 4:</strong> Вставьте этот код в нужное место:</p>
+            <pre id="modx-snippet">&lt;!-- Support Chat Widget --&gt;
+&lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
+  &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;💬 Поддержка&lt;/div&gt;
+  &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
+  &lt;div style=&quot;padding:12px;border-top:1px solid #dee2e6;display:flex;gap:8px;&quot;&gt;
+    &lt;input type=&quot;text&quot; id=&quot;support-input&quot; placeholder=&quot;Напишите сообщение...&quot; style=&quot;flex:1;padding:10px 14px;border:1px solid #dee2e6;border-radius:24px;outline:none;font-size:14px;&quot; /&gt;
+    &lt;button onclick=&quot;sendMessage()&quot; style=&quot;width:40px;height:40px;border-radius:50%;background:#4361ee;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;padding:0;&quot;&gt;➤&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;toggle-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:60px;height:60px;background:#4361ee;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(67,97,238,0.4);z-index:10001;font-size:24px;&quot; onclick=&quot;toggleWidget()&quot;&gt;💬&lt;/div&gt;
+
+&lt;script&gt;
+// ⚠️ ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ ДОМЕН!
+const API_BASE = 'https://ваш_домен.com/api';
+
+// ... остальной JavaScript код такой же, как для Tilda ...
+// (полный код см. во вкладке Tilda)
+&lt;/script&gt;</pre>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Кнопка-иконка -->
-  <div id="toggle-widget" onclick="toggleWidget()">💬</div>
-
   <script>
-    // Замените на ваш реальный домен!
-    const API_BASE = 'https://veonlinechat.duckdns.org/api';
+    // Демо-виджет (только для этой страницы)
+    const API_BASE = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000/api'
+      : '/api';
 
-    let chatId = localStorage.getItem('support_chat_id');
+    let demoChatId = localStorage.getItem('demo_support_chat_id');
 
-    function toggleWidget() {
-      const widget = document.getElementById('support-widget');
-      widget.style.display = widget.style.display === 'block' ? 'none' : 'block';
-    }
-
-    async function initChat() {
-      if (!chatId) {
+    async function initDemoChat() {
+      if (!demoChatId) {
         const res = await fetch(`${API_BASE}/chat/start`);
         const data = await res.json();
-        chatId = data.chat_id;
-        localStorage.setItem('support_chat_id', chatId);
+        demoChatId = data.chat_id;
+        localStorage.setItem('demo_support_chat_id', demoChatId);
       }
-      loadMessages();
+      loadDemoMessages();
     }
 
-    async function loadMessages() {
-      if (!chatId) return;
-      const res = await fetch(`${API_BASE}/chat/${chatId}`);
+    async function loadDemoMessages() {
+      const res = await fetch(`${API_BASE}/chat/${demoChatId}`);
       const data = await res.json();
-      const el = document.getElementById('messages');
+      const el = document.getElementById('demo-messages');
       el.innerHTML = '';
       data.messages.forEach(m => {
         const div = document.createElement('div');
@@ -176,27 +380,35 @@
       el.scrollTop = el.scrollHeight;
     }
 
-    async function sendMessage() {
-      const text = document.getElementById('message').value.trim();
+    async function sendDemoMessage() {
+      const text = document.getElementById('demo-message').value.trim();
       if (!text) return;
 
-      await fetch(`${API_BASE}/chat/${chatId}/message`, {
+      await fetch(`${API_BASE}/chat/${demoChatId}/message`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({text})
       });
 
-      document.getElementById('message').value = '';
-      loadMessages();
+      document.getElementById('demo-message').value = '';
+      loadDemoMessages();
     }
 
-    document.getElementById('message')?.addEventListener('keypress', e => {
-      if (e.key === 'Enter') sendMessage();
+    document.getElementById('demo-message').addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendDemoMessage();
     });
 
-    // Инициализация при открытии виджета
-    document.getElementById('toggle-widget').addEventListener('click', () => {
-      if (!chatId) initChat();
+    initDemoChat();
+    setInterval(loadDemoMessages, 2000);
+
+    // Переключение платформ
+    document.querySelectorAll('.platform-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.code-block').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.target + '-code').classList.add('active');
+      });
     });
   </script>
 </body>
