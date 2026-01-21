@@ -439,16 +439,20 @@ async function sendMessage() {
     body: JSON.stringify({role: 'visitor', is_typing: false})
   });
 
-  // Отправляем сообщение
+  // Используем FormData для отправки
+  const formData = new FormData();
+  formData.append('text', text);
+
   const res = await fetch(`${API_BASE}/chat/${chatId}/message`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: `text=${encodeURIComponent(text)}`
+    body: formData  // ← автоматически установит правильный Content-Type
   });
 
   if (res.ok) {
     document.getElementById('support-input').value = '';
     loadMessages();
+  } else {
+    console.error('Ошибка отправки:', await res.text());
   }
 }
 
