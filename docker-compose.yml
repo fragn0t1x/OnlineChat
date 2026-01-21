@@ -39,7 +39,7 @@ services:
       - OPERATOR_CHAT_IDS=${OPERATOR_CHAT_IDS}
       - WEBHOOK_HOST=${WEBHOOK_HOST}
       - CHAT_INACTIVE_DAYS=${CHAT_INACTIVE_DAYS}
-      - REDIS_URL={REDIS_URL}
+      - REDIS_URL=${REDIS_URL}
     depends_on:
       - db
       - redis
