@@ -68,20 +68,11 @@
       border-bottom-left-radius: 4px;
     }
 
-    .preview {
-      max-width: 200px;
-      max-height: 200px;
-      border-radius: 8px;
-      margin-top: 6px;
-      display: block;
-    }
-
     .input-area {
       padding: 12px;
       border-top: 1px solid var(--border);
       display: flex;
       gap: 8px;
-      align-items: center;
     }
 
     .input-area input[type="text"] {
@@ -93,30 +84,18 @@
       font-size: 14px;
     }
 
-    .attach-btn, .send-btn {
+    .send-btn {
       width: 40px;
       height: 40px;
       border-radius: 50%;
+      background: var(--primary);
+      color: white;
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
-    }
-
-    .attach-btn {
-      background: #f1f3f5;
-      color: #495057;
-    }
-
-    .send-btn {
-      background: var(--primary);
-      color: white;
-    }
-
-    .file-input {
-      display: none;
     }
   </style>
 </head>
@@ -126,8 +105,6 @@
     <div class="messages" id="messages"></div>
     <div class="input-area">
       <input type="text" id="message" placeholder="Напишите сообщение..." />
-      <label for="fileInput" class="attach-btn">📎</label>
-      <input type="file" id="fileInput" class="file-input" accept="image/*,.pdf,.doc,.txt" />
       <button class="send-btn" onclick="sendMessage()">➤</button>
     </div>
   </div>
@@ -157,22 +134,7 @@
       data.messages.forEach(m => {
         const div = document.createElement('div');
         div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-        if (m.text) div.textContent = m.text;
-        if (m.file_url) {
-          if (m.file_url.endsWith('.jpg') || m.file_url.endsWith('.jpeg') ||
-              m.file_url.endsWith('.png') || m.file_url.endsWith('.gif')) {
-            const img = document.createElement('img');
-            img.src = m.file_url;
-            img.className = 'preview';
-            div.appendChild(img);
-          } else {
-            const a = document.createElement('a');
-            a.href = m.file_url;
-            a.textContent = '📎 Скачать файл';
-            a.target = '_blank';
-            div.appendChild(a);
-          }
-        }
+        div.textContent = m.text || '—';
         el.appendChild(div);
       });
       el.scrollTop = el.scrollHeight;
@@ -180,35 +142,18 @@
 
     async function sendMessage() {
       const text = document.getElementById('message').value.trim();
-      const fileInput = document.getElementById('fileInput');
-      const file = fileInput.files[0];
+      if (!text) return;
 
-      const formData = new FormData();
-      if (text) formData.append('text', text);
-      if (file) formData.append('file', file);
-
-      const res = await fetch(`${API_BASE}/chat/${chatId}/message`, {
+      await fetch(`${API_BASE}/chat/${chatId}/message`, {
         method: 'POST',
-        body: formData
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text})
       });
 
-      if (res.ok) {
-        document.getElementById('message').value = '';
-        fileInput.value = '';
-        loadMessages();
-      }
+      document.getElementById('message').value = '';
+      loadMessages();
     }
 
-    // Attach file on click
-    document.getElementById('fileInput').addEventListener('change', () => {
-      const file = document.getElementById('fileInput').files[0];
-      if (file) {
-        const fileName = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
-        document.getElementById('message').placeholder = `Файл: ${fileName}`;
-      }
-    });
-
-    // Send on Enter
     document.getElementById('message').addEventListener('keypress', e => {
       if (e.key === 'Enter') sendMessage();
     });
