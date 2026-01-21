@@ -54,5 +54,9 @@ app.include_router(chat.router, prefix="/api")
 async def operator_page():
     return FileResponse("/frontend/operator.html")
 
+@app.get("/support-widget.js")
+async def widget_js():
+    return FileResponse("/frontend/support-widget.js", media_type="application/javascript")
+
 # Остальные статические файлы (виджет)
 app.mount("/", StaticFiles(directory="/frontend", html=True), name="static")
