@@ -1,5 +1,6 @@
 # backend/app/main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 from contextlib import asynccontextmanager
@@ -36,6 +37,14 @@ async def lifespan(app: FastAPI):
         t.cancel()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ← разрешить все источники (для разработки)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # API
 app.include_router(chat.router, prefix="/api")
