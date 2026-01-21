@@ -10,6 +10,8 @@
       --light: #f8f9fa;
       --dark: #212529;
       --border: #dee2e6;
+      --online: #28a745;
+      --offline: #6c757d;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -35,6 +37,27 @@
       color: white;
       font-weight: 600;
       font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .online-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--offline);
+    }
+
+    .status-dot.online {
+      background: var(--online);
     }
 
     .messages {
@@ -51,6 +74,7 @@
       padding: 10px 14px;
       border-radius: 18px;
       line-height: 1.4;
+      position: relative;
     }
 
     .visitor {
@@ -65,6 +89,13 @@
       background: var(--primary);
       color: white;
       border-bottom-right-radius: 4px;
+    }
+
+    .typing-indicator {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: var(--dark);
+      opacity: 0.7;
     }
 
     .input-area {
@@ -100,8 +131,15 @@
 </head>
 <body>
   <div class="chat-container">
-    <div class="header">👨‍💻 Оператор — Чат <span id="chat-id"></span></div>
+    <div class="header">
+      <span>👨‍💻 Оператор — Чат <span id="chat-id"></span></span>
+      <div class="online-status">
+        <div class="status-dot" id="visitor-status"></div>
+        <span>Посетитель</span>
+      </div>
+    </div>
     <div class="messages" id="messages"></div>
+    <div id="typing-indicator" class="typing-indicator" style="display:none;">Посетитель печатает...</div>
     <div class="input-area">
       <input type="text" id="message" placeholder="Напишите ответ..." />
       <button class="send-btn" onclick="sendReply()">➤</button>
@@ -117,16 +155,64 @@
     const chatId = urlParams.get('chat_id');
     document.getElementById('chat-id').textContent = chatId;
 
+    // Форматирование даты
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      if (date >= today) return 'Сегодня';
+      if (date >= yesterday) return 'Вчера';
+
+      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric', year: 'numeric' });
+    }
+
+    // Форматирование времени
+    function formatTime(dateStr) {
+      return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+
     async function loadMessages() {
       const res = await fetch(`${API_BASE}/chat/${chatId}`);
       const data = await res.json();
       const el = document.getElementById('messages');
       el.innerHTML = '';
+
+      // Группировка по датам
+      const groups = {};
       data.messages.forEach(m => {
-        const div = document.createElement('div');
-        div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
-        div.textContent = m.text || '—';
-        el.appendChild(div);
+        const dateKey = formatDate(m.created_at);
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(m);
+      });
+
+      Object.keys(groups).forEach(dateLabel => {
+        const dateDiv = document.createElement('div');
+        dateDiv.style.marginTop = '16px';
+        dateDiv.style.fontSize = '12px';
+        dateDiv.style.color = '#6c757d';
+        dateDiv.style.textAlign = 'center';
+        dateDiv.textContent = dateLabel;
+        el.appendChild(dateDiv);
+
+        groups[dateLabel].forEach(m => {
+          const div = document.createElement('div');
+          div.className = `message ${m.sender === 'visitor' ? 'visitor' : 'operator'}`;
+          div.textContent = m.text || '—';
+
+          // Время
+          const timeEl = document.createElement('div');
+          timeEl.style.fontSize = '10px';
+          timeEl.style.opacity = '0.7';
+          timeEl.style.marginTop = '4px';
+          timeEl.style.textAlign = m.sender === 'visitor' ? 'left' : 'right';
+          timeEl.textContent = formatTime(m.created_at);
+          div.appendChild(timeEl);
+
+          el.appendChild(div);
+        });
       });
       el.scrollTop = el.scrollHeight;
     }
@@ -135,14 +221,70 @@
       const text = document.getElementById('message').value.trim();
       if (!text) return;
 
-      await fetch(`${API_BASE}/chat/${chatId}/reply`, {
+      // Отправляем статус "не печатает"
+      await fetch(`${API_BASE}/chat/${chatId}/typing`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text})
+        body: JSON.stringify({role: 'operator', is_typing: false})
       });
 
-      document.getElementById('message').value = '';
-      loadMessages();
+      // Отправляем сообщение
+      const formData = new FormData();
+      formData.append('text', text);
+      const res = await fetch(`${API_BASE}/chat/${chatId}/reply`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        document.getElementById('message').value = '';
+        loadMessages();
+      }
+    }
+
+    // Обработка набора текста
+    let typingTimeout;
+    document.getElementById('message')?.addEventListener('input', () => {
+      if (!chatId) return;
+
+      // Отправляем статус "печатает"
+      fetch(`${API_BASE}/chat/${chatId}/typing`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: 'operator', is_typing: true})
+      });
+
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        fetch(`${API_BASE}/chat/${chatId}/typing`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({role: 'operator', is_typing: false})
+        });
+      }, 2000);
+    });
+
+    // Загрузка статусов
+    async function loadStatuses() {
+      try {
+        // Онлайн-статус посетителя
+        const onlineRes = await fetch(`${API_BASE}/chat/${chatId}/online`);
+        const onlineData = await onlineRes.json();
+        const statusDot = document.getElementById('visitor-status');
+        if (statusDot) {
+          statusDot.className = `status-dot ${onlineData.visitor_online ? 'online' : ''}`;
+        }
+
+        // Статус "печатает" посетителя
+        const typingRes = await fetch(`${API_BASE}/chat/${chatId}/typing?role=visitor`);
+        const typingData = await typingRes.json();
+        const typingEl = document.getElementById('typing-indicator');
+        if (typingEl) {
+          typingEl.style.display = typingData.is_typing ? 'block' : 'none';
+        }
+      } catch (e) {
+        console.error('Ошибка загрузки статусов:', e);
+      }
     }
 
     document.getElementById('message').addEventListener('keypress', e => {
@@ -150,7 +292,20 @@
     });
 
     loadMessages();
-    setInterval(loadMessages, 2000);
+    loadStatuses();
+    setInterval(() => {
+      loadMessages();
+      loadStatuses();
+    }, 2000);
+
+    // Heartbeat как оператор
+    setInterval(() => {
+      fetch(`${API_BASE}/chat/${chatId}/heartbeat`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: 'operator'})
+      });
+    }, 25000);
   </script>
 </body>
 </html>

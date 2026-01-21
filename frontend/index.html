@@ -10,6 +10,7 @@
       --light: #f8f9fa;
       --dark: #212529;
       --border: #dee2e6;
+      --online: #28a745;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -193,7 +194,10 @@
           <div class="chat-container">
             <div style="padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;">
               💬 Поддержка
-              <span id="demo-online-status" style="float:right;font-size:12px;"></span>
+              <span id="demo-online-status" style="float:right;display:flex;align-items:center;gap:6px;font-size:12px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#28a745;"></div>
+                <span>Онлайн</span>
+              </span>
             </div>
             <div class="messages" id="demo-messages"></div>
             <div id="demo-typing-indicator" style="padding:8px 16px;font-size:12px;color:#6c757d;display:none;">Оператор печатает...</div>
@@ -216,11 +220,7 @@
         <p>Скопируйте код ниже и вставьте его в HTML-блок вашего сайта.</p>
 
         <div class="warning">
-          ⚠️ <strong>Важно:</strong>
-          <ol>
-            <li>Замените <code>https://ваш_домен.com</code> на ваш реальный адрес</li>
-            <li>Убедитесь, что в <code>main.py</code> настроен CORS для вашего домена</li>
-          </ol>
+          ⚠️ <strong>Важно:</strong> Замените <code>https://ваш_домен.com</code> на ваш реальный адрес.
         </div>
 
         <div class="platform">
@@ -239,7 +239,10 @@
 &lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
   &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;
     💬 Поддержка
-    &lt;span id=&quot;online-status&quot; style=&quot;float:right;font-size:12px;&quot;&gt;&lt;/span&gt;
+    &lt;span id=&quot;online-status&quot; style=&quot;float:right;display:flex;align-items:center;gap:6px;font-size:12px;&quot;&gt;
+      &lt;div style=&quot;width:8px;height:8px;border-radius:50%;background:#28a745;&quot;&gt;&lt;/div&gt;
+      &lt;span&gt;Онлайн&lt;/span&gt;
+    &lt;/span&gt;
   &lt;/div&gt;
   &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
   &lt;div id=&quot;typing-indicator&quot; style=&quot;padding:8px 16px;font-size:12px;color:#6c757d;display:none;&quot;&gt;Оператор печатает...&lt;/div&gt;
@@ -302,14 +305,6 @@ function toggleWidget() {
     widget.style.display = 'block';
     if (!chatId) initChat();
     startPolling();
-    // Heartbeat как visitor
-    setInterval(() =&gt; {
-      fetch(`${API_BASE}/chat/${chatId}/heartbeat`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({role: 'visitor'})
-      });
-    }, 25000);
   } else {
     widget.style.display = 'none';
     stopPolling();
@@ -358,15 +353,6 @@ async function loadMessages() {
     const typingEl = document.getElementById('typing-indicator');
     if (typingEl) {
       typingEl.style.display = typingData.is_typing ? 'block' : 'none';
-    }
-
-    // Онлайн-статус
-    const onlineRes = await fetch(`${API_BASE}/chat/${chatId}/online`);
-    const onlineData = await onlineRes.json();
-    const onlineEl = document.getElementById('online-status');
-    if (onlineEl) {
-      onlineEl.textContent = onlineData.operator_online ? '● Оператор онлайн' : '○ Оператор оффлайн';
-      onlineEl.style.color = onlineData.operator_online ? '#28a745' : '#6c757d';
     }
   } catch (e) {
     console.error('Ошибка загрузки сообщений:', e);
@@ -439,20 +425,17 @@ async function sendMessage() {
     body: JSON.stringify({role: 'visitor', is_typing: false})
   });
 
-  // Используем FormData для отправки
+  // Отправляем сообщение
   const formData = new FormData();
   formData.append('text', text);
-
   const res = await fetch(`${API_BASE}/chat/${chatId}/message`, {
     method: 'POST',
-    body: formData  // ← автоматически установит правильный Content-Type
+    body: formData
   });
 
   if (res.ok) {
     document.getElementById('support-input').value = '';
     loadMessages();
-  } else {
-    console.error('Ошибка отправки:', await res.text());
   }
 }
 
@@ -516,7 +499,10 @@ document.getElementById('toggle-widget').addEventListener('click', () =&gt; {
 &lt;div id=&quot;support-widget&quot; style=&quot;position:fixed;bottom:24px;right:24px;width:340px;z-index:10000;display:none;background:white;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);&quot;&gt;
   &lt;div style=&quot;padding:16px 20px;background:#4361ee;color:white;font-weight:600;font-size:18px;&quot;&gt;
     💬 Поддержка
-    &lt;span id=&quot;online-status&quot; style=&quot;float:right;font-size:12px;&quot;&gt;&lt;/span&gt;
+    &lt;span id=&quot;online-status&quot; style=&quot;float:right;display:flex;align-items:center;gap:6px;font-size:12px;&quot;&gt;
+      &lt;div style=&quot;width:8px;height:8px;border-radius:50%;background:#28a745;&quot;&gt;&lt;/div&gt;
+      &lt;span&gt;Онлайн&lt;/span&gt;
+    &lt;/span&gt;
   &lt;/div&gt;
   &lt;div id=&quot;support-messages&quot; style=&quot;height:300px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;&quot;&gt;&lt;/div&gt;
   &lt;div id=&quot;typing-indicator&quot; style=&quot;padding:8px 16px;font-size:12px;color:#6c757d;display:none;&quot;&gt;Оператор печатает...&lt;/div&gt;
@@ -578,13 +564,6 @@ const API_BASE = 'https://ваш_домен.com/api';
         const typingEl = document.getElementById('demo-typing-indicator');
         if (typingEl) {
           typingEl.style.display = typingData.is_typing ? 'block' : 'none';
-        }
-
-        // Онлайн-статус
-        const onlineEl = document.getElementById('demo-online-status');
-        if (onlineEl) {
-          onlineEl.textContent = '● Оператор онлайн';
-          onlineEl.style.color = '#28a745';
         }
       } catch (e) {
         console.error('Ошибка загрузки демо-сообщений:', e);
@@ -651,10 +630,11 @@ const API_BASE = 'https://ваш_домен.com/api';
       const text = document.getElementById('demo-message').value.trim();
       if (!text) return;
 
+      const formData = new FormData();
+      formData.append('text', text);
       const res = await fetch(`${API_BASE}/chat/${demoChatId}/message`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `text=${encodeURIComponent(text)}`
+        body: formData
       });
 
       if (res.ok) {
