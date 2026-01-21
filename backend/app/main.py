@@ -38,9 +38,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+origins = os.getenv("CORS_ORIGINS", "").split(",")
+if origins == [""]:
+    origins = []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://project5666571.tilda.ws"],  # ← явно укажите ваш Tilda-сайт
+    allow_origins=origins,  # ← явно укажите ваш Tilda-сайт
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
